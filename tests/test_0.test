@@ -1,0 +1,7 @@
+central_player: center
+leaf_players: leaf1, leaf2, leaf3, leaf4
+
+activities:
+  hiking: 3
+  bus_trip: 2
+  void: inf

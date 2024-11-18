@@ -1,0 +1,25 @@
+central_player: center
+leaf_players: leaf1, leaf2, leaf3, leaf4, leaf5, leaf6, leaf7, leaf8, leaf9, leaf10, leaf11, leaf12, leaf13, leaf14, leaf15, leaf16, leaf17, leaf18, leaf19, leaf20
+
+activities:
+  hiking: 10
+  bus_trip: 6
+  cycling: 8
+  yoga: 2
+  running: 12
+  painting: inf
+  swimming: 5
+  cooking: 6
+  gaming: 8
+  dancing: 7
+  climbing: 9
+  meditation: 4
+  writing: 3
+  photography: 6
+  coding: 5
+  pottery: inf
+  gardening: 4
+  chess: 2
+  music: 10
+  astronomy: 7
+  void: inf
