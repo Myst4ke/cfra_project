@@ -1,58 +1,59 @@
 import itertools
 from typing import List, Dict, Set, Tuple
-# import os
+import random
 
 
-class ColourCodingStarNetworkWithCapacities:
-    def __init__(self, central_player: str, leaf_players: List[str], activities: List[str], activity_capacities: Dict[str, int]):
+class ColourCodingStarNetworkWithPreferences:
+    def __init__(self, central_player: str, leaf_players: List[str], activities: List[str], preferences: Dict[str, List[Tuple[str, int]]]):
         """
-        Initialise le réseau en étoile avec capacités explicites pour les activités.
+        Initialise le réseau en étoile avec des préférences pour chaque joueur.
         """
         self.central_player = central_player
         self.leaf_players = leaf_players
         self.activities = activities
-        self.activity_capacities = activity_capacities
+        self.preferences = preferences
         self.void_activity = "void"
 
     def guess_center_assignment(self) -> List[Tuple[str, int]]:
         """
-        Génère toutes les paires (activité, taille) possibles pour le joueur central.
+        Génère toutes les paires (activité, taille) possibles pour le joueur central en se basant sur ses préférences.
         """
-        guesses = []
-        for activity in self.activities:
-            max_size = self.activity_capacities.get(activity, len(self.leaf_players) + 1)
-            if max_size == float("inf"):
-                max_size = len(self.leaf_players) + 1
-
-            for k in range(1, max_size + 1):
-                guesses.append((activity, k))
-        return guesses
-
-
-    def guess_activities_in_use(self) -> List[Set[str]]:
-        """
-        Génère toutes les combinaisons possibles des activités utilisées par les feuilles.
-        """
-        activity_sets = []
-        for size in range(1, len(self.activities) + 1):
-            activity_sets.extend(itertools.combinations(self.activities, size))
-        return [set(activity_set) for activity_set in activity_sets]
-
+        return self.preferences.get(self.central_player, [])
+    
+    
     def random_colouring(self, activities_in_use: Set[str]) -> List[Dict[str, str]]:
         """
-        Génère des assignations aléatoires de couleurs (activités) aux feuilles.
+        Génère un ensemble de configurations aléatoires pour les feuilles.
         """
         possible_colours = list(activities_in_use) + [self.void_activity]
         random_assignments = []
-        for _ in range(100):  # Limitation pour tester différentes assignations.
-            assignment = {leaf: possible_colours[i % len(possible_colours)] for i, leaf in enumerate(self.leaf_players)}
+
+        for _ in range(100):
+            assignment = {leaf: random.choice(possible_colours) for leaf in self.leaf_players}
             random_assignments.append(assignment)
+
         return random_assignments
 
-    def is_assignment_stable(self, center_assignment: Tuple[str, int], activities_in_use: Set[str], leaf_assignment: Dict[str, str]) -> bool:
+
+    def exhaustive_colouring(self, activities_in_use: Set[str]) -> List[Dict[str, str]]:
         """
-        Vérifie si une assignation est compatible et stable.
+        Génère toutes les assignations possibles (non aléatoires) pour les feuilles.
         """
+        possible_colours = list(activities_in_use) + [self.void_activity]
+        return [
+            dict(zip(self.leaf_players, colouring))
+            for colouring in itertools.product(possible_colours, repeat=len(self.leaf_players))
+        ]
+        
+    def is_assignment_stable(
+        self, center_assignment: Tuple[str, int], activities_in_use: Set[str], leaf_assignment: Dict[str, str]
+    ) -> bool:
+        """
+        Vérifie si une assignation est compatible et stable en respectant les préférences des joueurs.
+        """
+        print(f"Testing stability for: center={center_assignment}, leaves={leaf_assignment}")
+        
+        # Compte des participants pour chaque activité
         activity_count = {activity: 0 for activity in activities_in_use}
         activity_count[self.void_activity] = 0
 
@@ -65,24 +66,28 @@ class ColourCodingStarNetworkWithCapacities:
         for leaf, activity in leaf_assignment.items():
             activity_count[activity] += 1
 
-        # Vérifier les limites de capacité pour chaque activité
-        for activity, count in activity_count.items():
-            if count > self.activity_capacities.get(activity, float("inf")):
-                return False
-
-        # Vérifier les contraintes pour le joueur central
+        # Vérifier si le joueur central est satisfait de son assignation
         center_group_size = center_assignment[1]
-        if activity_count[center_activity] != center_group_size:
+        if (center_activity, center_group_size) not in self.preferences[self.central_player]:
             return False
+
+        # Vérifier si les feuilles sont satisfaites de leurs assignations
+        for leaf, activity in leaf_assignment.items():
+            group_size = activity_count[activity]
+            if (activity, group_size) not in self.preferences[leaf] and activity != self.void_activity:
+                return False
 
         # Vérifier qu'aucune feuille en activité void ne veut dévier
         for leaf, activity in leaf_assignment.items():
             if activity == self.void_activity:
                 for alt_activity in activities_in_use:
-                    if alt_activity != self.void_activity and activity_count[alt_activity] < self.activity_capacities.get(alt_activity, 0):
+                    new_group_size = activity_count[alt_activity] + 1
+                    if (alt_activity, new_group_size) in self.preferences[leaf]:
                         return False
 
         return True
+    
+    
 
 
     def find_nash_stable_assignment(self) -> Dict[str, str]:
@@ -90,7 +95,7 @@ class ColourCodingStarNetworkWithCapacities:
         Cherche une assignation stable de Nash en utilisant la technique du colour-coding.
         """
         center_guesses = self.guess_center_assignment()
-        activity_guesses = self.guess_activities_in_use()
+        activity_guesses = [set(pref[0] for pref in self.preferences[self.central_player])]
 
         for center_assignment in center_guesses:
             for activities_in_use in activity_guesses:
@@ -101,14 +106,15 @@ class ColourCodingStarNetworkWithCapacities:
 
         return None
 
-def parse_test_file(file_path: str) -> Tuple[str, List[str], List[str], Dict[str, int]]:
+
+def parse_test_file(file_path: str) -> Tuple[str, List[str], List[str], Dict[str, List[Tuple[str, int]]]]:
     """
-    Parse un fichier .test pour générer la configuration du réseau en étoile.
+    Parse un fichier .test pour générer la configuration du réseau en étoile avec des préférences.
     """
     central_player = ""
     leaf_players = []
     activities = []
-    activity_capacities = {}
+    preferences = {}
 
     with open(file_path, "r") as file:
         for line in file:
@@ -123,33 +129,44 @@ def parse_test_file(file_path: str) -> Tuple[str, List[str], List[str], Dict[str
                 leaf_players = [player.strip() for player in line.split(":", 1)[1].split(",")]
 
             elif line.startswith("activities:"):
-                for activity_line in file:
-                    activity_line = activity_line.strip()
-                    if not activity_line or activity_line.startswith("#"):
-                        continue
-                    if ":" not in activity_line:
-                        break
-                    activity, capacity = activity_line.split(":", 1)
-                    activities.append(activity.strip())
-                    if capacity.strip().lower() == "inf":
-                        activity_capacities[activity.strip()] = float("inf")
-                    else:
-                        activity_capacities[activity.strip()] = int(capacity.strip())
+                activities = [activity.strip() for activity in line.split(":", 1)[1].split(",")]
 
-    return central_player, leaf_players, activities, activity_capacities
+            elif line.startswith("preferences:"):
+                for preference_line in file:
+                    preference_line = preference_line.strip()
+                    if not preference_line or preference_line.startswith("#"):
+                        continue
+
+                    if ":" in preference_line:
+                        player, prefs = preference_line.split(":", 1)
+                        player = player.strip()
+
+                        preferences[player] = []
+                        for pref in prefs.split(">"):
+                            activity, num = pref.strip(" ()").split(",")
+                            preferences[player].append((activity.strip(), int(num.strip())))
+
+    return central_player, leaf_players, activities, preferences
+
+
 
 
 if __name__ == "__main__":
-    test_file_path = "tests/test_5.test"
+    test_file_path = "tests/test_1.test"
 
-    central_player, leaf_players, activities, activity_capacities = parse_test_file(test_file_path)
+    central_player, leaf_players, activities, preferences = parse_test_file(test_file_path)
 
     print(f"Joueur central : {central_player}")
     print(f"Joueurs périphériques : {leaf_players}")
     print(f"Activités disponibles : {activities}")
-    print(f"Capacités des activités : {activity_capacities}")
+    print(f"Préférences des joueurs : {preferences}")
 
-    star_network = ColourCodingStarNetworkWithCapacities(central_player, leaf_players, activities, activity_capacities)
+    star_network = ColourCodingStarNetworkWithPreferences(
+        central_player=central_player,
+        leaf_players=leaf_players,
+        activities=activities,
+        preferences=preferences,
+    )
 
     result = star_network.find_nash_stable_assignment()
     if result:

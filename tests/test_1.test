@@ -1,8 +1,11 @@
 central_player: center
-leaf_players: leaf1, leaf2, leaf3, leaf4, leaf5
+leaf_players: leaf1, leaf2, leaf3, leaf4
 
-activities:
-  hiking: 3
-  bus_trip: 2
-  cycling: 4
-  void: inf
+activities: hiking, bus_trip, void
+
+preferences:
+  center: (hiking,3)>(bus_trip,2)>(hiking,1)
+  leaf1: (hiking,3)>(bus_trip,2)
+  leaf2: (bus_trip,2)>(hiking,4)
+  leaf3: (hiking,3)
+  leaf4: (hiking,3)>(bus_trip,2)>(hiking,1)
